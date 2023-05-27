@@ -17,10 +17,12 @@ using namespace std;
 using namespace boost::filesystem;
 
 // Units of time in seconds
+#define MINUTE 60
+#define HOUR (60 * 60)
 #define DAY (60 * 60 * 24)
 #define WEEK (DAY * 7)
-#define MONTH (DAY * 3.5)
-#define YEAR (DAY * 365.25)
+#define YEAR ((int)(DAY * 365.25))
+#define MONTH (YEAR / 12)
 
 struct task
 {
@@ -45,9 +47,9 @@ public:
 // For saving to files ONLY
 ofstream &operator<<(ofstream &Stream, const task &What)
 {
-    Stream << '"' << What.name << "\", \"" << What.description
-           << "\", " << What.importance << ", " << (long int)What.created << ", "
-           << (long int)What.due << ",\n";
+    Stream << '"' << What.name << "\" \"" << What.description
+           << "\" " << What.importance << " " << (long int)What.created << " "
+           << (long int)What.due;
 
     return Stream;
 }
@@ -181,6 +183,134 @@ void colorPrint(const task &What)
     return;
 }
 
+string timeFromNow(const time_t &Then, const time_t &Now)
+{
+    long int dif = abs(Then - Now);
+    int years, months, weeks, days, hours, minutes, seconds;
+
+    years = dif / YEAR;
+    dif %= YEAR;
+
+    months = dif / MONTH;
+    dif %= MONTH;
+
+    weeks = dif / WEEK;
+    dif %= WEEK;
+
+    days = dif / DAY;
+    dif %= DAY;
+
+    hours = dif / HOUR;
+    dif %= HOUR;
+
+    minutes = dif / MINUTE;
+    dif %= MINUTE;
+
+    seconds = dif;
+
+    string out;
+    if (years != 0)
+    {
+        out += to_string(years) + ((years == 1) ? " year " : " years ");
+    }
+    if (months != 0)
+    {
+        out += to_string(months) + ((months == 1) ? " month " : " months ");
+    }
+    if (weeks != 0)
+    {
+        out += to_string(weeks) + ((weeks == 1) ? " week " : " weeks ");
+    }
+    if (days != 0)
+    {
+        out += to_string(days) + ((days == 1) ? " day " : " days ");
+    }
+    if (hours != 0)
+    {
+        out += to_string(hours) + ((hours == 1) ? " hour " : " hours ");
+    }
+    if (minutes != 0)
+    {
+        out += to_string(minutes) + ((minutes == 1) ? " minute " : " minutes ");
+    }
+    if (seconds != 0)
+    {
+        out += to_string(seconds) + ((seconds == 1) ? " second " : " seconds ");
+    }
+
+    // Future or past
+    if (Then < Now)
+    {
+        out += "ago";
+    }
+    else
+    {
+        out += "from now";
+    }
+
+    return out;
+}
+
+time_t parseTime(const string &T, const time_t &Now)
+{
+    /*
+    1y2m3w4d5h6i7s
+    */
+
+    time_t out = Now;
+    string cur;
+
+    try
+    {
+        for (char c : T)
+        {
+            switch (c)
+            {
+            case 'y': // years
+                out += stoi(cur) * YEAR;
+                cur = "";
+                break;
+            case 'm': // months
+                out += stoi(cur) * MONTH;
+                cur = "";
+                break;
+            case 'w': // weeks
+                out += stoi(cur) * WEEK;
+                cur = "";
+                break;
+            case 'd': // days
+                out += stoi(cur) * DAY;
+                cur = "";
+                break;
+            case 'h': // hours
+                out += stoi(cur) * HOUR;
+                cur = "";
+                break;
+            case 'i': // minutes
+                out += stoi(cur) * MINUTE;
+                cur = "";
+                break;
+            case 's': // seconds
+                out += stoi(cur);
+                cur = "";
+                break;
+            default:
+                cur += c;
+                break;
+            }
+        }
+    }
+    catch (...)
+    {
+        cout << tags::red_bold
+             << "Could not decipher string '" << T << "'\n"
+             << tags::reset;
+        out = 0;
+    }
+
+    return out;
+}
+
 int main(const int argc, const char *argv[])
 {
     // Params to be loaded
@@ -199,7 +329,10 @@ int main(const int argc, const char *argv[])
         if (!settings.is_open())
         {
             settings.close();
-            throw runtime_error("Could not create settings file.");
+            cout << tags::red_bold
+                 << "Could not create settings file.\n"
+                 << tags::reset;
+            return 1;
         }
         settings.close();
 
@@ -207,7 +340,10 @@ int main(const int argc, const char *argv[])
         if (!profile.is_open())
         {
             profile.close();
-            throw runtime_error("Could not create default profile.");
+            cout << tags::red_bold
+                 << "Could not create default profile.\n"
+                 << tags::reset;
+            return 2;
         }
         profile.close();
     }
@@ -216,7 +352,10 @@ int main(const int argc, const char *argv[])
     ifstream settings(folder.string() + "/settings.txt");
     if (!settings.is_open())
     {
-        throw runtime_error("Could not open settings file.");
+        cout << tags::red_bold
+             << "Could not open settings file.\n"
+             << tags::reset;
+        return 3;
     }
 
     string argName, restOfLine;
@@ -259,34 +398,41 @@ int main(const int argc, const char *argv[])
     prof.close();
 
     // Parse args
+    time_t now = time(NULL);
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "add") == 0)
         {
-            if (i + 3 >= argc)
+            if (i + 4 >= argc)
             {
                 // Invalid number of args
-                throw runtime_error("'add' reuires three arguments: name, description, and importance.");
+                cout << tags::red_bold
+                     << "'add' reuires four arguments: name, description, importance, and due time string.\n"
+                     << tags::reset;
+                return 4;
             }
 
             task toAdd;
             toAdd.name = argv[i + 1];
             toAdd.description = argv[i + 2];
             toAdd.importance = stoi(argv[i + 3]);
-            toAdd.created = time(NULL);
+            toAdd.created = now;
 
-            // Ask about due time
-            // TEMP
-            toAdd.due = toAdd.created + DAY;
+            toAdd.due = parseTime(string(argv[i + 4]), toAdd.created);
 
-            i += 3;
+            tasks.push_back(toAdd);
+
+            i += 4;
         }
         else if (strcmp(argv[i], "done") == 0)
         {
             if (i + 1 >= argc)
             {
                 // Invalid number of args
-                throw runtime_error("'done' requires one argument: name to remove.");
+                cout << tags::red_bold
+                     << "'done' requires one argument: name to remove.\n"
+                     << tags::reset;
+                return 4;
             }
 
             bool beenErased = false;
@@ -311,9 +457,9 @@ int main(const int argc, const char *argv[])
         }
         else if (strcmp(argv[i], "list") == 0)
         {
-            time_t cur = time(NULL);
-            cout << "It is currently " << ctime(&cur) << '\n';
+            cout << "It is currently " << ctime(&now) << '\n';
 
+            // Quick and dirty heap sort
             priority_queue<task, vector<task>, __pq_sort> taskPQ;
             for (auto t : tasks)
             {
@@ -323,6 +469,9 @@ int main(const int argc, const char *argv[])
             while (!taskPQ.empty())
             {
                 cout << "Due " << ctime(&taskPQ.top().due);
+
+                cout << timeFromNow(taskPQ.top().due, now) << '\n';
+
                 colorPrint(taskPQ.top());
                 cout << '\n';
 
@@ -333,7 +482,10 @@ int main(const int argc, const char *argv[])
         {
             if (i + 1 >= argc)
             {
-                throw runtime_error("'profile' takes one argument: profile name.");
+                cout << tags::red_bold
+                     << "'profile' takes one argument: profile name.\n"
+                     << tags::reset;
+                return 4;
             }
 
             cout << "Switched profile from '" << profile << "' to '";
@@ -344,6 +496,56 @@ int main(const int argc, const char *argv[])
 
             i++;
         }
+        else if (strcmp(argv[i], "clear") == 0)
+        {
+            cout << "Clearing all overdue tasks.\n";
+
+            bool beenErased = false;
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].due <= now)
+                {
+                    beenErased = true;
+                    tasks.erase(tasks.begin() + j);
+                    j--;
+                }
+            }
+
+            if (!beenErased)
+            {
+                cout << tags::yellow_bold
+                     << "Warning: No items were erased.\n"
+                     << tags::reset;
+            }
+
+            cout << "Done.\n";
+        }
+        else if (strcmp(argv[i], "show") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                cout << tags::red_bold
+                     << "'show' takes one argument: name.\n"
+                     << tags::reset;
+                return 4;
+            }
+
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].name == argv[i + 1])
+                {
+                    cout << "Due: " << ctime(&tasks[j].due)
+                         << "(" << timeFromNow(tasks[j].due, now) << ")\n";
+
+                    colorPrint(tasks[j]);
+
+                    cout << "Description: " << tasks[j].description << '\n'
+                         << "Created: " << ctime(&tasks[j].created) << "\n";
+                }
+            }
+
+            i += 1;
+        }
         else if (strcmp(argv[i], "help") == 0)
         {
             cout << tags::violet_bold
@@ -351,8 +553,10 @@ int main(const int argc, const char *argv[])
                  << "      Jordan Dehmel, 2023, GPL3      \n"
                  << "------------- Commands: -------------\n"
                  << " add 'NAME' 'DESCRIPTION' IMPORTANCE \n"
+                 << " show 'NAME'                         \n"
                  << " done 'NAME'                         \n"
                  << " profile 'PROFILENAME'               \n"
+                 << " clear                               \n"
                  << " list                                \n"
                  << " help                                \n"
                  << "-------------------------------------\n"
@@ -370,6 +574,20 @@ int main(const int argc, const char *argv[])
     }
 
     // Save to file
+    ofstream saveProf(profilePath.string());
+    if (!saveProf.is_open())
+    {
+        cout << tags::red_bold
+             << "Could not open profile file to save changes.\n"
+             << tags::reset;
+        return 5;
+    }
+
+    for (task t : tasks)
+    {
+        saveProf << t << '\n';
+    }
+    saveProf.close();
 
     return 0;
 }
