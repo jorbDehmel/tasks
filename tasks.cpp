@@ -7,6 +7,8 @@ Protected by GPLv3
 
 #include "helpers.hpp"
 
+#define VERSION "0.0.1"
+
 int main(const int argc, const char *argv[])
 {
     if (argc == 1)
@@ -122,7 +124,7 @@ int main(const int argc, const char *argv[])
             {
                 // Invalid number of args
                 cout << tags::red_bold
-                     << "'add' reuires four arguments: name, description, importance, and due time string.\n"
+                     << "'add' requires four arguments: name, description, importance, and due time string.\n"
                      << tags::reset;
                 return 4;
             }
@@ -386,7 +388,6 @@ int main(const int argc, const char *argv[])
         {
             cout << "                Tasks                \n"
                  << "      Jordan Dehmel, 2023, GPL3      \n"
-                 << tags::violet_bold
                  << "------------- Commands: -------------\n"
                  << " add/new 'NAME' 'DESC' IMP TIMESTRING\n"
                  << " show 'NAME'                         \n"
@@ -401,7 +402,6 @@ int main(const int argc, const char *argv[])
                  << " list                                \n"
                  << " help                                \n"
                  << "-------------------------------------\n"
-                 << tags::reset
                  << "Importance must be 1, 2 or 3.        \n"
                  << "Enclose strings in quotes.           \n"
                  << "Timestrings must take the form:      \n"
@@ -409,7 +409,9 @@ int main(const int argc, const char *argv[])
                  << "denote periods of time from now and  \n"
                  << "the letters denote units (y = year,  \n"
                  << "m = month, w = week, d = day, h =    \n"
-                 << "hour, i = minute, s = second).       \n\n";
+                 << "hour, i = minute, s = second).       \n"
+                 << "-------------------------------------\n"
+                 << "Version " << VERSION << "\n\n";
         }
         else
         {
