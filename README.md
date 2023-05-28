@@ -24,6 +24,8 @@ directory.
 
 ### Adding or Removing Tasks
 
+All of these will be prefixed by `tasks`, obviously.
+
 Command        | Arguments                                 | Purpose
 ---------------|-------------------------------------------|--------------------------------------
 `add` or `new` | name, description, importance, timestring | Adds a new task.
