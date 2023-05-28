@@ -5,317 +5,22 @@ Protected by GPLv3
 2023 - present
 */
 
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
-#include <queue>
-#include "tags.hpp"
-using namespace std;
-
-#include <boost/filesystem.hpp>
-using namespace boost::filesystem;
-
-// Units of time in seconds
-#define MINUTE 60
-#define HOUR (60 * 60)
-#define DAY (60 * 60 * 24)
-#define WEEK (DAY * 7)
-#define YEAR ((int)(DAY * 365.25))
-#define MONTH (YEAR / 12)
-
-struct task
-{
-    string name;
-    string description;
-
-    unsigned int importance;
-
-    time_t created;
-    time_t due;
-};
-
-class __pq_sort
-{
-public:
-    bool operator()(const task &a, const task &b)
-    {
-        return a.due > b.due;
-    }
-};
-
-// For saving to files ONLY
-ofstream &operator<<(ofstream &Stream, const task &What)
-{
-    Stream << '"' << What.name << "\" \"" << What.description
-           << "\" " << What.importance << " " << (long int)What.created << " "
-           << (long int)What.due;
-
-    return Stream;
-}
-
-istream &operator>>(istream &Stream, task &What)
-{
-    // cout << "ASLDKFJL\n";
-
-    // Name
-    string name, description;
-
-    Stream >> name;
-    if (name.empty())
-    {
-        if (Stream.eof())
-        {
-            return Stream;
-        }
-        What.name = What.description = "READ ERROR";
-        What.created = What.due = What.importance = -1;
-        return Stream;
-    }
-
-    if (name.front() == '"')
-    {
-        while (name.back() != '"')
-        {
-            string temp;
-            Stream >> temp;
-            name += " " + temp;
-        }
-
-        name = name.substr(1, name.size() - 2);
-    }
-    else if (name.front() == '\'')
-    {
-        while (name.back() != '\'')
-        {
-            string temp;
-            Stream >> temp;
-            name += " " + temp;
-        }
-
-        name = name.substr(1, name.size() - 2);
-    }
-
-    // Description
-    Stream >> description;
-    if (description.empty())
-    {
-        What.name = What.description = "READ ERROR";
-        What.created = What.due = What.importance = -1;
-        return Stream;
-    }
-
-    if (description.front() == '"')
-    {
-        while (description.back() != '"')
-        {
-            string temp;
-            Stream >> temp;
-            description += " " + temp;
-        }
-
-        description = description.substr(1, description.size() - 2);
-    }
-    else if (description.front() == '\'')
-    {
-        while (description.back() != '\'')
-        {
-            string temp;
-            Stream >> temp;
-            description += " " + temp;
-        }
-
-        description = description.substr(1, description.size() - 2);
-    }
-
-    What.name = name;
-    What.description = description;
-
-    // Rest of data
-    Stream >> What.importance;
-    if (Stream.eof())
-    {
-        return Stream;
-    }
-
-    Stream >> What.created;
-    if (Stream.eof())
-    {
-        return Stream;
-    }
-
-    Stream >> What.due;
-    if (Stream.eof())
-    {
-        return Stream;
-    }
-
-    return Stream;
-}
-
-// For printing to cout
-void colorPrint(const task &What)
-{
-    switch (What.importance)
-    {
-    case 0: // Most important
-        cout << tags::red_bold;
-        break;
-    case 1:
-        cout << tags::yellow_bold;
-        break;
-    case 2:
-        cout << tags::green_bold;
-        break;
-    case 3:
-        cout << tags::green;
-        break;
-    case 4: // Least important
-        break;
-    default: // Finished or invalid
-        cout << tags::strikeout;
-        break;
-    }
-
-    cout << What.name << " (" << What.importance << ")\n"
-         << tags::reset;
-
-    return;
-}
-
-string timeFromNow(const time_t &Then, const time_t &Now)
-{
-    long int dif = abs(Then - Now);
-    int years, months, weeks, days, hours, minutes, seconds;
-
-    years = dif / YEAR;
-    dif %= YEAR;
-
-    months = dif / MONTH;
-    dif %= MONTH;
-
-    weeks = dif / WEEK;
-    dif %= WEEK;
-
-    days = dif / DAY;
-    dif %= DAY;
-
-    hours = dif / HOUR;
-    dif %= HOUR;
-
-    minutes = dif / MINUTE;
-    dif %= MINUTE;
-
-    seconds = dif;
-
-    string out;
-    if (years != 0)
-    {
-        out += to_string(years) + ((years == 1) ? " year " : " years ");
-    }
-    if (months != 0)
-    {
-        out += to_string(months) + ((months == 1) ? " month " : " months ");
-    }
-    if (weeks != 0)
-    {
-        out += to_string(weeks) + ((weeks == 1) ? " week " : " weeks ");
-    }
-    if (days != 0)
-    {
-        out += to_string(days) + ((days == 1) ? " day " : " days ");
-    }
-    if (hours != 0)
-    {
-        out += to_string(hours) + ((hours == 1) ? " hour " : " hours ");
-    }
-    if (minutes != 0)
-    {
-        out += to_string(minutes) + ((minutes == 1) ? " minute " : " minutes ");
-    }
-    if (seconds != 0)
-    {
-        out += to_string(seconds) + ((seconds == 1) ? " second " : " seconds ");
-    }
-
-    // Future or past
-    if (Then < Now)
-    {
-        out += "ago";
-    }
-    else
-    {
-        out += "from now";
-    }
-
-    return out;
-}
-
-time_t parseTime(const string &T, const time_t &Now)
-{
-    /*
-    1y2m3w4d5h6i7s
-    */
-
-    time_t out = Now;
-    string cur;
-
-    try
-    {
-        for (char c : T)
-        {
-            switch (c)
-            {
-            case 'y': // years
-                out += stoi(cur) * YEAR;
-                cur = "";
-                break;
-            case 'm': // months
-                out += stoi(cur) * MONTH;
-                cur = "";
-                break;
-            case 'w': // weeks
-                out += stoi(cur) * WEEK;
-                cur = "";
-                break;
-            case 'd': // days
-                out += stoi(cur) * DAY;
-                cur = "";
-                break;
-            case 'h': // hours
-                out += stoi(cur) * HOUR;
-                cur = "";
-                break;
-            case 'i': // minutes
-                out += stoi(cur) * MINUTE;
-                cur = "";
-                break;
-            case 's': // seconds
-                out += stoi(cur);
-                cur = "";
-                break;
-            default:
-                cur += c;
-                break;
-            }
-        }
-    }
-    catch (...)
-    {
-        cout << tags::red_bold
-             << "Could not decipher string '" << T << "'\n"
-             << tags::reset;
-        out = 0;
-    }
-
-    return out;
-}
+#include "helpers.hpp"
 
 int main(const int argc, const char *argv[])
 {
+    if (argc == 1)
+    {
+        cout << tags::red_bold
+             << "Please enter an argument (help for more info).\n"
+             << tags::reset;
+        return 4;
+    }
+
     // Params to be loaded
-    string profile = "default";
     vector<task> tasks;
+    map<string, string> settingsMap;
+    settingsMap["profile"] = "default";
 
     path folder = string(getenv("HOME")) + "/.tasks";
 
@@ -364,21 +69,21 @@ int main(const int argc, const char *argv[])
         settings >> argName;
         getline(settings, restOfLine);
 
-        if (argName == "profile")
+        while (restOfLine[0] == ' ')
         {
-            profile = restOfLine;
+            restOfLine = restOfLine.substr(1);
         }
-        else if (argName != "")
+        while (restOfLine.back() == ' ')
         {
-            cout << tags::red_bold
-                 << "Unrecognized setting '" << argName << "' ignored.\n"
-                 << tags::reset;
+            restOfLine.pop_back();
         }
+
+        settingsMap[argName] = restOfLine;
     }
     settings.close();
 
     // Load profile
-    path profilePath = folder.string() + "/" + profile + ".tp";
+    path profilePath = folder.string() + "/" + settingsMap["profile"] + ".tp";
 
     ifstream prof(profilePath.string());
 
@@ -386,6 +91,11 @@ int main(const int argc, const char *argv[])
     while (!prof.eof())
     {
         prof >> temp;
+
+        if (temp.name == "READ ERROR")
+        {
+            break;
+        }
 
         tasks.push_back(temp);
 
@@ -397,11 +107,16 @@ int main(const int argc, const char *argv[])
 
     prof.close();
 
-    // Parse args
     time_t now = time(NULL);
+    cout << "-------------------------------------\n"
+         << "It is " << tags::violet_bold << ctime(&now) << tags::reset
+         << "Profile '" << settingsMap["profile"] << "' has " << tasks.size() << " tasks.\n"
+         << "-------------------------------------\n\n";
+
+    // Parse args
     for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "add") == 0)
+        if (strcmp(argv[i], "add") == 0 || strcmp(argv[i], "new") == 0)
         {
             if (i + 4 >= argc)
             {
@@ -422,6 +137,8 @@ int main(const int argc, const char *argv[])
 
             tasks.push_back(toAdd);
 
+            cout << "Added item '" << argv[i + 1] << "'\n\n";
+
             i += 4;
         }
         else if (strcmp(argv[i], "done") == 0)
@@ -435,30 +152,23 @@ int main(const int argc, const char *argv[])
                 return 4;
             }
 
-            bool beenErased = false;
+            int numRemoved = 0;
             for (int j = 0; j < tasks.size(); j++)
             {
                 if (tasks[j].name == argv[i + 1])
                 {
-                    beenErased = true;
+                    numRemoved++;
                     tasks.erase(tasks.begin() + j);
                     j--;
                 }
             }
 
-            if (!beenErased)
-            {
-                cout << tags::yellow_bold
-                     << "Warning: No items were erased.\n"
-                     << tags::reset;
-            }
+            cout << "Erased " << numRemoved << " items.\n\n";
 
             i++;
         }
         else if (strcmp(argv[i], "list") == 0)
         {
-            cout << "It is currently " << ctime(&now) << '\n';
-
             // Quick and dirty heap sort
             priority_queue<task, vector<task>, __pq_sort> taskPQ;
             for (auto t : tasks)
@@ -468,14 +178,16 @@ int main(const int argc, const char *argv[])
 
             while (!taskPQ.empty())
             {
-                cout << "Due " << ctime(&taskPQ.top().due);
-
                 cout << timeFromNow(taskPQ.top().due, now) << '\n';
-
                 colorPrint(taskPQ.top());
-                cout << '\n';
+                cout << "\n";
 
                 taskPQ.pop();
+            }
+
+            if (tasks.size() == 0)
+            {
+                cout << "There are no items to list.\n\n";
             }
         }
         else if (strcmp(argv[i], "profile") == 0)
@@ -488,11 +200,9 @@ int main(const int argc, const char *argv[])
                 return 4;
             }
 
-            cout << "Switched profile from '" << profile << "' to '";
-
-            profile = argv[i + 1];
-
-            cout << profile << "'\n";
+            cout << "Switched profile from '" << settingsMap["profile"] << "' to '";
+            settingsMap["profile"] = argv[i + 1];
+            cout << settingsMap["profile"] << "'\n\n";
 
             i++;
         }
@@ -500,25 +210,18 @@ int main(const int argc, const char *argv[])
         {
             cout << "Clearing all overdue tasks.\n";
 
-            bool beenErased = false;
+            int numRemoved = 0;
             for (int j = 0; j < tasks.size(); j++)
             {
                 if (tasks[j].due <= now)
                 {
-                    beenErased = true;
+                    numRemoved++;
                     tasks.erase(tasks.begin() + j);
                     j--;
                 }
             }
 
-            if (!beenErased)
-            {
-                cout << tags::yellow_bold
-                     << "Warning: No items were erased.\n"
-                     << tags::reset;
-            }
-
-            cout << "Done.\n";
+            cout << "Erased " << numRemoved << " items.\n\n";
         }
         else if (strcmp(argv[i], "show") == 0)
         {
@@ -530,39 +233,183 @@ int main(const int argc, const char *argv[])
                 return 4;
             }
 
+            bool matched = false;
             for (int j = 0; j < tasks.size(); j++)
             {
                 if (tasks[j].name == argv[i + 1])
                 {
-                    cout << "Due: " << ctime(&tasks[j].due)
-                         << "(" << timeFromNow(tasks[j].due, now) << ")\n";
-
-                    colorPrint(tasks[j]);
-
-                    cout << "Description: " << tasks[j].description << '\n'
-                         << "Created: " << ctime(&tasks[j].created) << "\n";
+                    matched = true;
+                    cout << "Name:        | " << tasks[j].name << '\n'
+                         << "Description: | " << tasks[j].description << '\n'
+                         << "Importance:  | " << tasks[j].importance << '\n'
+                         << "Created at:  | " << ctime(&tasks[j].created)
+                         << "Due at:      | " << ctime(&tasks[j].due)
+                         << timeFromNow(tasks[j].due, now) << "\n\n";
                 }
+            }
+
+            if (!matched)
+            {
+                cout << "'" << argv[i + 1] << "' did not match any tasks.\n\n";
             }
 
             i += 1;
         }
+        else if (strcmp(argv[i], "doneall") == 0)
+        {
+            cout << "Erased " << tasks.size() << " items.\n\n";
+            tasks.clear();
+        }
+        else if (strcmp(argv[i], "donethru") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                cout << tags::red_bold
+                     << "'donethru' takes one argument: end time.\n"
+                     << tags::reset;
+                return 4;
+            }
+
+            time_t thresh = parseTime(argv[i + 1], now);
+
+            int numRemoved = 0;
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].due <= thresh)
+                {
+                    numRemoved++;
+                    tasks.erase(tasks.begin() + j);
+                    j--;
+                }
+            }
+
+            cout << "Erased " << numRemoved << " items.\n\n";
+            i += 1;
+        }
+        else if (strcmp(argv[i], "donebet") == 0)
+        {
+            if (i + 2 >= argc)
+            {
+                cout << tags::red_bold
+                     << "'donebet' takes two arguments: start time and end time.\n"
+                     << tags::reset;
+                return 4;
+            }
+
+            time_t lower = parseTime(argv[i + 1], now);
+            time_t upper = parseTime(argv[i + 2], now);
+
+            int numRemoved = 0;
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].due >= lower && tasks[j].due < upper)
+                {
+                    numRemoved++;
+                    tasks.erase(tasks.begin() + j);
+                    j--;
+                }
+            }
+
+            cout << "Erased " << numRemoved << " items.\n\n";
+            i += 2;
+        }
+        else if (strcmp(argv[i], "showthru") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                cout << tags::red_bold
+                     << "'showthru' takes one argument: end time.\n"
+                     << tags::reset;
+                return 4;
+            }
+
+            time_t thresh = parseTime(argv[i + 1], now);
+
+            bool matched = false;
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].due < thresh)
+                {
+                    matched = true;
+                    cout << "Name:        | " << tasks[j].name << '\n'
+                         << "Description: | " << tasks[j].description << '\n'
+                         << "Importance:  | " << tasks[j].importance << '\n'
+                         << "Created at:  | " << ctime(&tasks[j].created)
+                         << "Due at:      | " << ctime(&tasks[j].due)
+                         << timeFromNow(tasks[j].due, now) << "\n\n";
+                }
+            }
+
+            if (!matched)
+            {
+                cout << "No items fell within this time range.\n\n";
+            }
+
+            i += 1;
+        }
+        else if (strcmp(argv[i], "showbet") == 0)
+        {
+            if (i + 1 >= argc)
+            {
+                cout << tags::red_bold
+                     << "'showbet' takes two arguments: start time and end time.\n"
+                     << tags::reset;
+                return 4;
+            }
+
+            time_t lower = parseTime(argv[i + 1], now);
+            time_t upper = parseTime(argv[i + 2], now);
+
+            bool matched = false;
+            for (int j = 0; j < tasks.size(); j++)
+            {
+                if (tasks[j].due >= lower && tasks[j].due < upper)
+                {
+                    matched = true;
+                    cout << "Name:        | " << tasks[j].name << '\n'
+                         << "Description: | " << tasks[j].description << '\n'
+                         << "Importance:  | " << tasks[j].importance << '\n'
+                         << "Created at:  | " << ctime(&tasks[j].created)
+                         << "Due at:      | " << ctime(&tasks[j].due)
+                         << timeFromNow(tasks[j].due, now) << "\n\n";
+                }
+            }
+
+            if (!matched)
+            {
+                cout << "No items fell within this time range.\n\n";
+            }
+
+            i += 2;
+        }
         else if (strcmp(argv[i], "help") == 0)
         {
-            cout << tags::violet_bold
-                 << "                Tasks                \n"
+            cout << "                Tasks                \n"
                  << "      Jordan Dehmel, 2023, GPL3      \n"
+                 << tags::violet_bold
                  << "------------- Commands: -------------\n"
-                 << " add 'NAME' 'DESCRIPTION' IMPORTANCE \n"
+                 << " add/new 'NAME' 'DESC' IMP TIMESTRING\n"
                  << " show 'NAME'                         \n"
                  << " done 'NAME'                         \n"
+                 << " donethru TIMESTRING                 \n"
+                 << " donebet TIMESTRING TIMESTRING       \n"
+                 << " doneall                             \n"
+                 << " showthru TIMESTRING                 \n"
+                 << " showbet TIMESTRING TIMESTRING       \n"
                  << " profile 'PROFILENAME'               \n"
                  << " clear                               \n"
                  << " list                                \n"
                  << " help                                \n"
                  << "-------------------------------------\n"
-                 << "Importance must be an integer from 1 \n"
-                 << "to 4. Enclose strings in quotes.     \n"
-                 << tags::reset;
+                 << tags::reset
+                 << "Importance must be 1, 2 or 3.        \n"
+                 << "Enclose strings in quotes.           \n"
+                 << "Timestrings must take the form:      \n"
+                 << "'1y2m3w4d5h6i7s', where the numbers  \n"
+                 << "denote periods of time from now and  \n"
+                 << "the letters denote units (y = year,  \n"
+                 << "m = month, w = week, d = day, h =    \n"
+                 << "hour, i = minute, s = second).       \n\n";
         }
         else
         {
@@ -588,6 +435,25 @@ int main(const int argc, const char *argv[])
         saveProf << t << '\n';
     }
     saveProf.close();
+
+    ofstream saveSettings(folder.string() + "/settings.txt");
+    if (!saveSettings.is_open())
+    {
+        cout << tags::red_bold
+             << "Could not open settings file to save changes.\n"
+             << tags::reset;
+        return 6;
+    }
+
+    for (pair<string, string> item : settingsMap)
+    {
+        if (item.first != "")
+        {
+            saveSettings << item.first << " " << item.second << '\n';
+        }
+    }
+
+    saveSettings.close();
 
     return 0;
 }
