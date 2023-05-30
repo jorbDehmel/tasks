@@ -121,13 +121,13 @@ void colorPrint(const task &What)
 {
     switch (What.importance)
     {
-    case 1: // Most important
+    case 3: // Most important
         cout << tags::red_bold;
         break;
     case 2:
         cout << tags::yellow_bold;
         break;
-    case 3:
+    case 1:
         cout << tags::green_bold;
         break;
     default: // Finished or invalid
