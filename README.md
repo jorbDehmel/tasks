@@ -66,8 +66,8 @@ s      | second
 A timestring is some combination of these letters and
 numbers, denoting some time from the current moment.
 For instance, one week from right now would be '1w'.
-One year, six months, one week, 2 days, 12 hours, 10
-minutes and 16 seconds would be '1y6m1w2d12h10i16s'.
+One year, six months, one week, two days, twelve hours, ten
+minutes and sixteen seconds would be '1y6m1w2d12h10i16s'.
 
 ### Profiles
 
