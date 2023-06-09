@@ -283,7 +283,7 @@ void printFromMilitaryTime(const char *What)
     int hour = -1;
 
     sscanf(What, "%31s %31s %31s %d:%31s %31s",
-           &dayOfWeek, &month, &day, &hour, &timeRem, &year);
+           dayOfWeek, month, day, &hour, timeRem, year);
 
     printf("%s %s %s %d:%s %s %s\n",
            dayOfWeek, month, day,
