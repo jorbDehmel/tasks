@@ -291,4 +291,6 @@ void printFromMilitaryTime(const char *What)
            timeRem,
            (hour > 11 ? "PM" : "AM"),
            year);
+
+    return;
 }
