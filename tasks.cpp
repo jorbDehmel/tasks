@@ -111,8 +111,14 @@ int main(const int argc, const char *argv[])
 
     time_t now = time(NULL);
     cout << "-------------------------------------\n"
-         << "It is " << tags::violet_bold << ctime(&now) << tags::reset
-         << "Profile '" << settingsMap["profile"] << "' has " << tasks.size() << " tasks.\n"
+         << "It is "
+         << tags::violet_bold;
+
+    printFromMilitaryTime(ctime(&now));
+
+    cout << tags::reset
+         << "Profile '" << settingsMap["profile"]
+         << "' has " << tasks.size() << " task" << ((tasks.size() != 1) ? "s" : "") << ".\n"
          << "-------------------------------------\n\n";
 
     // Parse args

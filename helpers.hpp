@@ -47,4 +47,6 @@ void colorPrint(const task &What);
 string timeFromNow(const time_t &Then, const time_t &Now);
 time_t parseTime(const string &T, const time_t &Now);
 
+void printFromMilitaryTime(const char *What);
+
 #endif

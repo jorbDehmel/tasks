@@ -269,3 +269,26 @@ time_t parseTime(const string &T, const time_t &Now)
 
     return out;
 }
+
+// Because I do not like ctime's 24-hour clock
+void printFromMilitaryTime(const char *What)
+{
+    // Ex: 'Fri Jun  9 15:12:45 2023'
+    // To: 'Fri Jun  9 3:12:45 PM 2023'
+    // The 4th block of non-space before any colon
+    // Modulo this by 12 if it is >12
+    // Add AM if <12, add PM if >= 12
+
+    char dayOfWeek[32], month[32], day[32], timeRem[32], year[32];
+    int hour = -1;
+
+    sscanf(What, "%31s %31s %31s %d:%31s %31s",
+           &dayOfWeek, &month, &day, &hour, &timeRem, &year);
+
+    printf("%s %s %s %d:%s %s %s\n",
+           dayOfWeek, month, day,
+           hour > 12 ? hour % 12 : hour,
+           timeRem,
+           (hour > 11 ? "PM" : "AM"),
+           year);
+}
